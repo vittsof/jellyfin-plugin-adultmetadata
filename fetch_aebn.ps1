@@ -1,0 +1,5 @@
+$session = New-Object Microsoft.PowerShell.Commands.WebRequestSession
+Invoke-WebRequest -Uri 'https://gay.aebn.com/avs/gate-redirect?f=%2Fgay' -UserAgent 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36' -WebSession $session | Out-Null
+$response = Invoke-WebRequest -Uri 'https://gay.aebn.com/dispatcher/search?type=t&where=b&query=Armed+Services' -UserAgent 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36' -WebSession $session
+$matches = [regex]::Matches($response.Content, 'href="/gay/movie/([^"]*)"[^>]*>([^<]*)</a>')
+$matches | ForEach-Object { Write-Host "$($_.Groups[2].Value.Trim()) - https://gay.aebn.com/gay/movie/$($_.Groups[1].Value)" } | Select-Object -First 5

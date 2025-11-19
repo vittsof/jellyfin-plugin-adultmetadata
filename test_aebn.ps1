@@ -1,0 +1,4 @@
+$session = New-Object Microsoft.PowerShell.Commands.WebRequestSession
+Invoke-WebRequest -Uri 'https://gay.aebn.com/avs/gate-redirect?f=%2Fgay' -UserAgent 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36' -WebSession $session | Out-Null
+$response = Invoke-WebRequest -Uri 'https://gay.aebn.com/gay/search?queryType=Free+Form&query=armed+services' -UserAgent 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36' -WebSession $session
+if ($response.Content -match 'Armed Services') { Write-Host 'AEBN: Found Armed Services' } else { Write-Host 'AEBN: Not found' }

@@ -27,6 +27,8 @@ namespace Jellyfin.Plugin.AdultMetadata.Movies
     {
         private readonly IHttpClientFactory _httpClientFactory;
         private readonly ILibraryManager _libraryManager;
+        private readonly HttpClientHandler _handler = new HttpClientHandler { CookieContainer = new CookieContainer() };
+        private readonly HttpClient _client;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="AdultMovieProvider"/> class.
@@ -39,6 +41,8 @@ namespace Jellyfin.Plugin.AdultMetadata.Movies
         {
             _libraryManager = libraryManager;
             _httpClientFactory = httpClientFactory;
+            _client = new HttpClient(_handler);
+            _client.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36");
         }
 
         /// <inheritdoc />
@@ -56,12 +60,16 @@ namespace Jellyfin.Plugin.AdultMetadata.Movies
 
             if (config.EnableGevi)
             {
+                // Add cookie for GEVI age-gate bypass
+                _handler.CookieContainer.Add(new Uri("https://gayeroticvideoindex.com"), new Cookie("entered", (DateTimeOffset.Now.ToUnixTimeMilliseconds() + 86400000 * 2).ToString()));
                 var geviResults = await SearchGevi(searchInfo.Name, cancellationToken);
                 results.AddRange(geviResults);
             }
 
             if (config.EnableAebn)
             {
+                // First, bypass AEBN age-gate
+                await _client.GetAsync("https://gay.aebn.com/avs/gate-redirect?f=%2Fgay", cancellationToken);
                 var aebnResults = await SearchAebn(searchInfo.Name, cancellationToken);
                 results.AddRange(aebnResults);
             }
@@ -127,8 +135,7 @@ namespace Jellyfin.Plugin.AdultMetadata.Movies
         /// <inheritdoc />
         public Task<HttpResponseMessage> GetImageResponse(string url, CancellationToken cancellationToken)
         {
-            var client = _httpClientFactory.CreateClient();
-            return client.GetAsync(url, cancellationToken);
+            return _client.GetAsync(url, cancellationToken);
         }
 
         private async Task<IEnumerable<RemoteSearchResult>> SearchGevi(string name, CancellationToken cancellationToken)
@@ -136,21 +143,15 @@ namespace Jellyfin.Plugin.AdultMetadata.Movies
             var results = new List<RemoteSearchResult>();
             try
             {
-                var client = _httpClientFactory.CreateClient();
-                client.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36");
                 // GEVI (gayeroticvideoindex) uses a search endpoint with form/query params: type=t, where=b, query=...
                 var searchUrl = $"https://gayeroticvideoindex.com/search?type=t&where=b&query={Uri.EscapeDataString(name)}";
 
-                // Try to pass age-gate if present
-                await EnsureAgeGatePassed(client, searchUrl, cancellationToken);
+                var response = await _client.GetStringAsync(searchUrl, cancellationToken);
 
-                var response = await client.GetStringAsync(searchUrl, cancellationToken);
-
-                // If the response still contains age-gate phrases, try to handle it post-GET
+                // If the response still contains age-gate phrases, skip
                 if (Regex.IsMatch(response, "(are you over|age verification|age_gate|over 18|please verify your age|enter your birth)", RegexOptions.IgnoreCase))
                 {
-                    await HandleAgeGateInResponse(client, response, searchUrl, cancellationToken);
-                    response = await client.GetStringAsync(searchUrl, cancellationToken);
+                    return results;
                 }
 
                 // Parse HTML for movie links using a more flexible anchor regex and filtering.
@@ -206,21 +207,15 @@ namespace Jellyfin.Plugin.AdultMetadata.Movies
             var results = new List<RemoteSearchResult>();
             try
             {
-                var client = _httpClientFactory.CreateClient();
-                client.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36");
                 // AEBN (gay.aebn.com) search uses queryType and query params
                 var searchUrl = $"https://gay.aebn.com/gay/search?queryType=Free+Form&query={Uri.EscapeDataString(name)}";
 
-                // Try to pass age-gate if present
-                await EnsureAgeGatePassed(client, searchUrl, cancellationToken);
+                var response = await _client.GetStringAsync(searchUrl, cancellationToken);
 
-                var response = await client.GetStringAsync(searchUrl, cancellationToken);
-
-                // If the response still contains age-gate phrases, try to handle it post-GET
+                // If the response still contains age-gate phrases, skip
                 if (Regex.IsMatch(response, "(are you over|age verification|age_gate|over 18|please verify your age|enter your birth)", RegexOptions.IgnoreCase))
                 {
-                    await HandleAgeGateInResponse(client, response, searchUrl, cancellationToken);
-                    response = await client.GetStringAsync(searchUrl, cancellationToken);
+                    return results;
                 }
 
                 // Parse HTML for movie links using flexible anchor matching and filters
@@ -272,8 +267,6 @@ namespace Jellyfin.Plugin.AdultMetadata.Movies
         {
             try
             {
-                var client = _httpClientFactory.CreateClient();
-                client.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36");
                 string url;
                 if (identifier.StartsWith("http", StringComparison.OrdinalIgnoreCase))
                 {
@@ -288,16 +281,12 @@ namespace Jellyfin.Plugin.AdultMetadata.Movies
                     url = first.ProviderIds["Gevi"];
                 }
 
-                // Attempt to pass any age gate on the movie page
-                await EnsureAgeGatePassed(client, url, cancellationToken);
+                var response = await _client.GetStringAsync(url, cancellationToken);
 
-                var response = await client.GetStringAsync(url, cancellationToken);
-
-                // If the response still contains age-gate phrases, try to handle it post-GET
+                // If the response still contains age-gate phrases, skip
                 if (Regex.IsMatch(response, "(are you over|age verification|age_gate|over 18|please verify your age|enter your birth)", RegexOptions.IgnoreCase))
                 {
-                    await HandleAgeGateInResponse(client, response, url, cancellationToken);
-                    response = await client.GetStringAsync(url, cancellationToken);
+                    return null;
                 }
 
                 // Parse HTML for metadata
@@ -326,8 +315,6 @@ namespace Jellyfin.Plugin.AdultMetadata.Movies
         {
             try
             {
-                var client = _httpClientFactory.CreateClient();
-                client.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36");
                 string url;
                 if (identifier.StartsWith("http", StringComparison.OrdinalIgnoreCase))
                 {
@@ -342,16 +329,12 @@ namespace Jellyfin.Plugin.AdultMetadata.Movies
                     url = first.ProviderIds["Aebn"];
                 }
 
-                // Attempt to pass any age gate on the movie page
-                await EnsureAgeGatePassed(client, url, cancellationToken);
+                var response = await _client.GetStringAsync(url, cancellationToken);
 
-                var response = await client.GetStringAsync(url, cancellationToken);
-
-                // If the response still contains age-gate phrases, try to handle it post-GET
+                // If the response still contains age-gate phrases, skip
                 if (Regex.IsMatch(response, "(are you over|age verification|age_gate|over 18|please verify your age|enter your birth)", RegexOptions.IgnoreCase))
                 {
-                    await HandleAgeGateInResponse(client, response, url, cancellationToken);
-                    response = await client.GetStringAsync(url, cancellationToken);
+                    return null;
                 }
 
                 // Parse HTML for metadata
@@ -390,159 +373,6 @@ namespace Jellyfin.Plugin.AdultMetadata.Movies
         /// Heuristic: detect common age-gate pages and try to submit an acceptance form or attach returned cookies
         /// so subsequent requests will be allowed. This is best-effort and uses simple form detection.
         /// </summary>
-        private async Task EnsureAgeGatePassed(HttpClient client, string url, CancellationToken cancellationToken)
-        {
-            try
-            {
-                // Do an initial GET
-                var resp = await client.GetAsync(url, cancellationToken);
-                var body = await resp.Content.ReadAsStringAsync(cancellationToken);
-
-                // Quick heuristics: look for age phrases or form that likely represents age gate
-                if (!Regex.IsMatch(body, "(are you over|age verification|age_gate|over 18|please verify your age|enter your birth)", RegexOptions.IgnoreCase))
-                {
-                    // nothing obvious indicating an age gate
-                    return;
-                }
-
-                // Try to find a form on the page
-                var formMatch = Regex.Match(body, "<form[^>]*action=\"([^\"]*)\"[^>]*>(.*?)</form>", RegexOptions.IgnoreCase | RegexOptions.Singleline);
-                if (!formMatch.Success)
-                {
-                    // If no form, try to pick up Set-Cookie returned and reuse
-                    if (resp.Headers.TryGetValues("Set-Cookie", out var sc))
-                    {
-                        var cookieHeader = string.Join("; ", sc.Select(s => s.Split(';')[0]));
-                        if (!string.IsNullOrEmpty(cookieHeader) && !client.DefaultRequestHeaders.Contains("Cookie"))
-                        {
-                            client.DefaultRequestHeaders.Add("Cookie", cookieHeader);
-                        }
-                    }
-                    return;
-                }
-
-                var action = formMatch.Groups[1].Value;
-                var formInner = formMatch.Groups[2].Value;
-
-                // Collect inputs
-                var inputs = new List<KeyValuePair<string, string>>();
-                foreach (Match im in Regex.Matches(formInner, "<input[^>]*name=\"([^\"]+)\"[^>]*>", RegexOptions.IgnoreCase))
-                {
-                    var name = im.Groups[1].Value;
-                    // try to find a value attribute
-                    var valMatch = Regex.Match(im.Value, "value=\"([^\"]*)\"", RegexOptions.IgnoreCase);
-                    var val = valMatch.Success ? valMatch.Groups[1].Value : string.Empty;
-                    // heuristics: if field name contains age/over/confirm/agree, set affirmative
-                    if (Regex.IsMatch(name, "age|over|confirm|agree|yes|accept", RegexOptions.IgnoreCase))
-                    {
-                        if (string.IsNullOrEmpty(val)) val = "yes";
-                    }
-                    inputs.Add(new KeyValuePair<string, string>(name, val));
-                }
-
-                // Resolve action URL
-                string actionUrl;
-                try
-                {
-                    actionUrl = action.StartsWith("http", StringComparison.OrdinalIgnoreCase) ? action : new Uri(new Uri(url), action).ToString();
-                }
-                catch
-                {
-                    actionUrl = url;
-                }
-
-                var content = new FormUrlEncodedContent(inputs);
-                var post = await client.PostAsync(actionUrl, content, cancellationToken);
-
-                // If server sets cookies, copy them into client default headers for next requests
-                if (post.Headers.TryGetValues("Set-Cookie", out var setCookies))
-                {
-                    var cookieHeader = string.Join("; ", setCookies.Select(s => s.Split(';')[0]));
-                    if (!string.IsNullOrEmpty(cookieHeader))
-                    {
-                        // replace existing Cookie header if present
-                        if (client.DefaultRequestHeaders.Contains("Cookie"))
-                        {
-                            client.DefaultRequestHeaders.Remove("Cookie");
-                        }
-                        client.DefaultRequestHeaders.Add("Cookie", cookieHeader);
-                    }
-                }
-            }
-            catch
-            {
-                // best-effort: swallow exceptions here so scraping can continue
-            }
-        }
-
-        /// <summary>
-        /// Handle age-gate in the response by submitting the form if found.
-        /// </summary>
-        private async Task HandleAgeGateInResponse(HttpClient client, string response, string url, CancellationToken cancellationToken)
-        {
-            try
-            {
-                // Try to find a form on the page
-                var formMatch = Regex.Match(response, "<form[^>]*action=\"([^\"]*)\"[^>]*>(.*?)</form>", RegexOptions.IgnoreCase | RegexOptions.Singleline);
-                if (!formMatch.Success)
-                {
-                    return;
-                }
-
-                var action = formMatch.Groups[1].Value;
-                var formInner = formMatch.Groups[2].Value;
-
-                // Collect inputs
-                var inputs = new List<KeyValuePair<string, string>>();
-                foreach (Match im in Regex.Matches(formInner, "<input[^>]*name=\"([^\"]+)\"[^>]*>", RegexOptions.IgnoreCase))
-                {
-                    var name = im.Groups[1].Value;
-                    // try to find a value attribute
-                    var valMatch = Regex.Match(im.Value, "value=\"([^\"]*)\"", RegexOptions.IgnoreCase);
-                    var val = valMatch.Success ? valMatch.Groups[1].Value : string.Empty;
-                    // heuristics: if field name contains age/over/confirm/agree, set affirmative
-                    if (Regex.IsMatch(name, "age|over|confirm|agree|yes|accept", RegexOptions.IgnoreCase))
-                    {
-                        if (string.IsNullOrEmpty(val)) val = "yes";
-                    }
-                    inputs.Add(new KeyValuePair<string, string>(name, val));
-                }
-
-                // Resolve action URL
-                string actionUrl;
-                try
-                {
-                    actionUrl = action.StartsWith("http", StringComparison.OrdinalIgnoreCase) ? action : new Uri(new Uri(url), action).ToString();
-                }
-                catch
-                {
-                    actionUrl = url;
-                }
-
-                var content = new FormUrlEncodedContent(inputs);
-                var post = await client.PostAsync(actionUrl, content, cancellationToken);
-
-                // If server sets cookies, copy them into client default headers for next requests
-                if (post.Headers.TryGetValues("Set-Cookie", out var setCookies))
-                {
-                    var cookieHeader = string.Join("; ", setCookies.Select(s => s.Split(';')[0]));
-                    if (!string.IsNullOrEmpty(cookieHeader))
-                    {
-                        // replace existing Cookie header if present
-                        if (client.DefaultRequestHeaders.Contains("Cookie"))
-                        {
-                            client.DefaultRequestHeaders.Remove("Cookie");
-                        }
-                        client.DefaultRequestHeaders.Add("Cookie", cookieHeader);
-                    }
-                }
-            }
-            catch
-            {
-                // best-effort: swallow exceptions here so scraping can continue
-            }
-        }
-
         /// <summary>
         /// Data class for adult movie metadata.
         /// </summary>
