@@ -265,6 +265,15 @@ namespace Jellyfin.Plugin.AdultMetadata.Movies
                         try { title = Uri.UnescapeDataString(new Uri(url).Segments.Last()).Trim('/'); } catch { title = url; }
                     }
 
+                    // Clean title: replace - with space and capitalize words
+                    title = System.Globalization.CultureInfo.CurrentCulture.TextInfo.ToTitleCase(title.Replace("-", " "));
+
+                    // Skip non-movie links
+                    if (title.Contains("matching", StringComparison.OrdinalIgnoreCase) || title.Contains("view all", StringComparison.OrdinalIgnoreCase))
+                    {
+                        continue;
+                    }
+
                     results.Add(new RemoteSearchResult
                     {
                         Name = title,

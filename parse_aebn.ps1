@@ -47,6 +47,14 @@ foreach ($match in $anchors) {
         }
     }
 
+    # Clean title: replace - with space and capitalize words
+    $title = (Get-Culture).TextInfo.ToTitleCase($title.Replace("-", " "))
+
+    # Skip non-movie links
+    if ($title -like "*matching*" -or $title -like "*view all*") {
+        continue
+    }
+
     $results += [PSCustomObject]@{
         Name = $title
         Url = $url
