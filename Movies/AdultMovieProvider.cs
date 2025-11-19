@@ -235,100 +235,76 @@ namespace Jellyfin.Plugin.AdultMetadata.Movies
                     return results;
                 }
 
-                // First collect movie anchors (direct links to movie pages) so we can match cards to URLs
-                var anchorMatches = Regex.Matches(response, "<a[^>]*href\\s*=\\s*\"([^\"]+)\"[^>]*>(.*?)</a>", RegexOptions.IgnoreCase | RegexOptions.Singleline);
-                var movieAnchors = new List<(string Url, string Title)>();
-                foreach (Match match in anchorMatches)
+                // Prefer extracting movie tiles directly from the movies grid.
+                // Find anchors that link to movie pages and extract title from contained <img title="..."> or fallback to slug -> readable title.
+                var movieAnchors = new List<(string Url, string Title, string Image)>();
+                var movieAnchorMatches = Regex.Matches(response, "<a[^>]*href\\s*=\\s*\"(?<href>/gay/movies/[^"]+)\"[^>]*>(?<inner>.*?)</a>", RegexOptions.IgnoreCase | RegexOptions.Singleline);
+                foreach (Match match in movieAnchorMatches)
                 {
-                    var href = match.Groups[1].Value.Trim();
-                    var inner = Regex.Replace(match.Groups[2].Value ?? string.Empty, "<[^>]+>", string.Empty).Trim();
+                    var href = match.Groups["href"].Value.Trim();
+                    var inner = match.Groups["inner"].Value ?? string.Empty;
+
                     if (string.IsNullOrEmpty(href)) continue;
+
+                    // Skip scene anchors and fragment links
+                    if (href.Contains("#scene") || href.Contains("#")) continue;
 
                     string url;
                     try
                     {
-                        url = href.StartsWith("http", StringComparison.OrdinalIgnoreCase) ? href : new Uri(new Uri(searchUrl), href).ToString();
+                        url = href.StartsWith("http", StringComparison.OrdinalIgnoreCase) ? href : new Uri(new Uri("https://gay.aebn.com"), href).ToString();
                     }
                     catch
                     {
                         continue;
                     }
 
-                    var lower = url.ToLowerInvariant();
-                    // keep only direct movie links (avoid category/navigation links)
-                    if (!(lower.Contains("/movies/") || lower.Contains("/video/") || lower.Contains("/watch/")))
+                    // Try to extract image title/alt inside the anchor (picture > img)
+                    string title = null;
+                    string image = null;
+
+                    var imgMatch = Regex.Match(inner, "<img[^>]*title\\s*=\\s*\"(?<t>[^\"]+)\"[^>]*src\\s*=\\s*\"(?<s>[^\"]+)\"[^>]*>", RegexOptions.IgnoreCase | RegexOptions.Singleline);
+                    if (!imgMatch.Success)
                     {
-                        continue;
+                        // title attribute might come after src or use alt
+                        imgMatch = Regex.Match(inner, "<img[^>]*(?:src\\s*=\\s*\"(?<s>[^\"]+)\"[^>]*title\\s*=\\s*\"(?<t>[^\"]+)\"|title\\s*=\\s*\"(?<t2>[^\"]+)\"[^>]*src\\s*=\\s*\"(?<s2>[^\"]+)\")[^>]*>", RegexOptions.IgnoreCase | RegexOptions.Singleline);
                     }
 
-                    var title = inner;
+                    if (imgMatch.Success)
+                    {
+                        title = imgMatch.Groups["t"].Success ? imgMatch.Groups["t"].Value : (imgMatch.Groups["t2"].Success ? imgMatch.Groups["t2"].Value : null);
+                        image = imgMatch.Groups["s"].Success ? imgMatch.Groups["s"].Value : (imgMatch.Groups["s2"].Success ? imgMatch.Groups["s2"].Value : null);
+                    }
+
                     if (string.IsNullOrEmpty(title))
                     {
-                        try { title = Uri.UnescapeDataString(new Uri(url).Segments.Last()).Trim('/'); } catch { title = url; }
-                    }
-
-                    movieAnchors.Add((url, title));
-                }
-
-                // Parse visible card titles and optional image/style within button/card blocks - prefer these for display names
-                var cardMatches = Regex.Matches(response, "<button[^>]*class=[^>]*card[^>]*>(.*?)</button>", RegexOptions.IgnoreCase | RegexOptions.Singleline);
-                foreach (Match card in cardMatches)
-                {
-                    var block = card.Groups[1].Value;
-
-                    // Try common title locations inside card
-                    string displayTitle = null;
-                    var m = Regex.Match(block, "<div[^>]*class=[^>]*cardText[^>]*cardText-first[^>]*>(.*?)</div>", RegexOptions.IgnoreCase | RegexOptions.Singleline);
-                    if (m.Success) displayTitle = Regex.Replace(m.Groups[1].Value ?? string.Empty, "<[^>]+>", string.Empty).Trim();
-
-                    if (string.IsNullOrEmpty(displayTitle))
-                    {
-                        m = Regex.Match(block, "<div[^>]*class=[^>]*cardText[^>]*cardCenteredText[^>]*>(.*?)</div>", RegexOptions.IgnoreCase | RegexOptions.Singleline);
-                        if (m.Success) displayTitle = Regex.Replace(m.Groups[1].Value ?? string.Empty, "<[^>]+>", string.Empty).Trim();
-                    }
-
-                    if (string.IsNullOrEmpty(displayTitle)) continue;
-
-                    // Try to find an image URL from style or img tag inside the block
-                    string imageUrl = null;
-                    var styleMatch = Regex.Match(block, @"background-image\s*:\s*url\(['""]?(.*?)['""]?\)", RegexOptions.IgnoreCase);
-                    if (styleMatch.Success) imageUrl = styleMatch.Groups[1].Value;
-                    else
-                    {
-                        var imgMatch = Regex.Match(block, "<img[^>]*src\\s*=\\s*([^\\s>]+)[^>]*>", RegexOptions.IgnoreCase);
-                        if (imgMatch.Success)
+                        // Fallback: derive from slug
+                        try
                         {
-                            var raw = imgMatch.Groups[1].Value.Trim();
-                            imageUrl = raw.Trim('"', '\'');
+                            var seg = new Uri(url).Segments.Last().Trim('/');
+                            title = SlugToTitle(seg);
+                        }
+                        catch
+                        {
+                            title = url;
                         }
                     }
 
-                    // Match displayTitle to one of the movie anchors by slug (last segment)
-                    string slug = ToSlug(displayTitle);
-                    var matched = movieAnchors.FirstOrDefault(a => ToSlug(a.Title).Equals(slug, StringComparison.OrdinalIgnoreCase) || a.Url.TrimEnd('/').EndsWith('/' + slug, StringComparison.OrdinalIgnoreCase));
-                    if (!string.IsNullOrEmpty(matched.Url))
-                    {
-                        results.Add(new RemoteSearchResult
-                        {
-                            Name = displayTitle,
-                            ProviderIds = new Dictionary<string, string> { { "Aebn", matched.Url } },
-                            SearchProviderName = Name
-                        });
-                    }
+                    movieAnchors.Add((url, title, image));
                 }
 
-                // Fallback: if we didn't find cards matched to anchors, add the anchors directly (use their parsed titles)
-                if (!results.Any())
+                // Add unique results preserving order
+                foreach (var a in movieAnchors)
                 {
-                    foreach (var a in movieAnchors)
+                    if (results.Any(r => r.ProviderIds != null && r.ProviderIds.ContainsKey("Aebn") && r.ProviderIds["Aebn"].Equals(a.Url, StringComparison.OrdinalIgnoreCase)))
+                        continue;
+
+                    results.Add(new RemoteSearchResult
                     {
-                        results.Add(new RemoteSearchResult
-                        {
-                            Name = a.Title,
-                            ProviderIds = new Dictionary<string, string> { { "Aebn", a.Url } },
-                            SearchProviderName = Name
-                        });
-                    }
+                        Name = a.Title,
+                        ProviderIds = new Dictionary<string, string> { { "Aebn", a.Url } },
+                        SearchProviderName = Name
+                    });
                 }
             }
             catch
@@ -347,6 +323,43 @@ namespace Jellyfin.Plugin.AdultMetadata.Movies
             lower = Regex.Replace(lower, "[^a-z0-9]+", "-");
             lower = Regex.Replace(lower, "-+", "-").Trim('-');
             return lower;
+        }
+
+        // Convert a slug like "armed-services" or "at-arm-s-length" into a readable title
+        private static string SlugToTitle(string slug)
+        {
+            if (string.IsNullOrWhiteSpace(slug)) return string.Empty;
+
+            // Replace dashes with spaces
+            var t = slug.Replace('-', ' ');
+
+            // Common pattern: "-s-" often represents possessive in some slugs (e.g. at-arm-s-length -> at arm's length)
+            t = Regex.Replace(t, "\b(s)\b", "'s", RegexOptions.IgnoreCase);
+
+            // Collapse multiple spaces
+            t = Regex.Replace(t, "\\s+", " ").Trim();
+
+            // Decode any HTML entities that might appear
+            try
+            {
+                t = System.Net.WebUtility.HtmlDecode(t);
+            }
+            catch
+            {
+                // ignore
+            }
+
+            // Title-case
+            try
+            {
+                t = CultureInfo.InvariantCulture.TextInfo.ToTitleCase(t.ToLowerInvariant());
+            }
+            catch
+            {
+                // ignore
+            }
+
+            return t;
         }
 
         private async Task<AdultMovieData?> FetchGeviMetadata(string identifier, CancellationToken cancellationToken)

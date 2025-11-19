@@ -1,0 +1,3 @@
+C:\Users\Prog2\GitHub\Jellyfin\jellyfin\jellyfin-plugin-adultmetadata\bin\Release\net8.0\publish\Jellyfin.Plugin.AdultMetadata.dll
+C:\Users\Prog2\GitHub\Jellyfin\jellyfin\jellyfin-plugin-adultmetadata\bin\Release\net8.0\publish\Jellyfin.Plugin.AdultMetadata.pdb
+C:\Users\Prog2\GitHub\Jellyfin\jellyfin\jellyfin-plugin-adultmetadata\bin\Release\net8.0\publish\Jellyfin.Plugin.AdultMetadata.deps.json

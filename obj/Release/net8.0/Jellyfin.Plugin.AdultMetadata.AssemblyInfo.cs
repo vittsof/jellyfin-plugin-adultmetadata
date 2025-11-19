@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("Jellyfin.Plugin.AdultMetadata")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Release")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.4.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+b1d1b2314e2ad76873a4bd2edacaa999ed5ae691")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+22479118931fddf9b7e04b8a7e81a1826efa832e")]
 [assembly: System.Reflection.AssemblyProductAttribute("Jellyfin.Plugin.AdultMetadata")]
 [assembly: System.Reflection.AssemblyTitleAttribute("Jellyfin.Plugin.AdultMetadata")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.4.0")]

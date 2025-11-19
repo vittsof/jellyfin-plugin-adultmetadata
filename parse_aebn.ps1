@@ -88,4 +88,35 @@ $final = @()
 foreach ($r in $results) { if (-not $dedup.ContainsKey($r.Url)) { $dedup[$r.Url] = $true; $final += $r } }
 
 Write-Host "Found $($final.Count) search results for '$name'"
-foreach ($result in $final) { Write-Host "Result: $($result.Name) - $($result.Url) - Image: $($result.Image)" }
+
+# For each final result, try to fetch the movie page and extract a poster image (og:image, twitter:image, or a poster img)
+foreach ($result in $final) {
+    $image = $result.Image
+    try {
+        # Use same session (age-gate bypass) to load movie page
+        $resp = Invoke-WebRequest -Uri $result.Url -WebSession $session -UseBasicParsing -ErrorAction Stop
+        $html = $resp.Content
+
+        # Try og:image
+        $m = [regex]::Match($html, '<meta[^>]*property=(?:"|\')og:image(?:"|\')[^>]*content=(?:"|\')(.*?)(?:"|\')', [System.Text.RegularExpressions.RegexOptions]::IgnoreCase)
+        if ($m.Success) { $image = $m.Groups[1].Value }
+        else {
+            $m = [regex]::Match($html, '<meta[^>]*name=(?:"|\')twitter:image(?:"|\')[^>]*content=(?:"|\')(.*?)(?:"|\')', [System.Text.RegularExpressions.RegexOptions]::IgnoreCase)
+            if ($m.Success) { $image = $m.Groups[1].Value }
+            else {
+                # Look for common poster img tags
+                $m = [regex]::Match($html, '<img[^>]*(?:class="[^"]*poster[^"]*"|id="poster"|itemprop="image")[^>]*src=(?:"|\')(.*?)(?:"|\')', [System.Text.RegularExpressions.RegexOptions]::IgnoreCase)
+                if ($m.Success) { $image = $m.Groups[1].Value }
+            }
+        }
+    } catch {
+        # ignore per-result failures
+    }
+
+    # Normalize relative URLs
+    if ($image -and -not $image.StartsWith("http", [System.StringComparison]::OrdinalIgnoreCase)) {
+        try { $image = [System.Uri]::new([System.Uri]$result.Url, $image).ToString() } catch {}
+    }
+
+    Write-Host "Result: $($result.Name) - $($result.Url) - Image: $($image)"
+}
