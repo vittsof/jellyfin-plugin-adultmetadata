@@ -254,6 +254,12 @@ namespace Jellyfin.Plugin.AdultMetadata.Movies
                         continue;
                     }
 
+                    // Skip scene links
+                    if (lower.Contains("#scene"))
+                    {
+                        continue;
+                    }
+
                     if (string.IsNullOrEmpty(title))
                     {
                         try { title = Uri.UnescapeDataString(new Uri(url).Segments.Last()).Trim('/'); } catch { title = url; }
