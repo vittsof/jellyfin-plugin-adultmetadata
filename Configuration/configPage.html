@@ -2,32 +2,42 @@
 <html>
 <head>
     <title>Adult Metadata Provider Configuration</title>
+    <style>
+        /* Ensure native controls are visible even if Jellyfin styles are not loaded */
+        .inputContainer { margin: 10px 0; }
+        .inputContainer label { display: inline-block; margin-right: 8px; vertical-align: middle; }
+        .inputContainer input[type="checkbox"] { width: auto; height: auto; vertical-align: middle; }
+        .inputContainer input, .inputContainer select { margin-left: 4px; }
+        .fieldDescription { color: #666; font-size: 0.9em; margin-top: 4px; }
+    </style>
 </head>
 <body>
     <div data-role="page" class="page type-interior pluginConfigurationPage" data-require="emby-input,emby-button,emby-select,emby-checkbox">
         <div data-role="content">
             <div class="content-primary">
-                <form class="adultMetadataConfigurationForm">
+                <form class="adultMetadataConfigurationForm" id="adultMetadataConfigurationForm">
                     <div class="verticalSection">
                         <h2 class="sectionTitle">Adult Metadata Provider</h2>
+
                         <div class="inputContainer">
-                            <label class="inputLabel inputLabelUnfocused" for="chkEnableGevi">Enable GEVI Provider</label>
-                            <input type="checkbox" id="chkEnableGevi" class="emby-checkbox" />
+                            <label for="chkEnableGevi"><input type="checkbox" id="chkEnableGevi" /> Enable GEVI Provider</label>
                             <div class="fieldDescription">Enable fetching metadata from GEVI.</div>
                         </div>
+
                         <div class="inputContainer">
-                            <label class="inputLabel inputLabelUnfocused" for="chkEnableAebn">Enable AEBN Provider</label>
-                            <input type="checkbox" id="chkEnableAebn" class="emby-checkbox" />
+                            <label for="chkEnableAebn"><input type="checkbox" id="chkEnableAebn" /> Enable AEBN Provider</label>
                             <div class="fieldDescription">Enable fetching metadata from AEBN.</div>
                         </div>
+
                         <div class="inputContainer">
-                            <label class="inputLabel inputLabelUnfocused" for="txtAebnApiKey">AEBN API Key</label>
-                            <input type="text" id="txtAebnApiKey" class="emby-input" />
+                            <label class="inputLabel" for="txtAebnApiKey">AEBN API Key</label>
+                            <input type="text" id="txtAebnApiKey" />
                             <div class="fieldDescription">API key for AEBN (if available).</div>
                         </div>
+
                         <div class="inputContainer">
-                            <label class="inputLabel inputLabelUnfocused" for="selectLanguage">Language</label>
-                            <select id="selectLanguage" class="emby-select">
+                            <label class="inputLabel" for="selectLanguage">Language</label>
+                            <select id="selectLanguage">
                                 <option value="en">English</option>
                                 <option value="el">Greek</option>
                             </select>
@@ -35,11 +45,79 @@
                         </div>
                     </div>
                     <div>
-                        <button type="submit" class="emby-button raised button-submit block">Save</button>
+                        <button type="submit" class="button-submit">Save</button>
                     </div>
                 </form>
             </div>
         </div>
     </div>
+
+    <script>
+        // Minimal wiring: load/save configuration using the built-in plugin API if present.
+        (function () {
+            const form = document.getElementById('adultMetadataConfigurationForm');
+            const pluginId = 'f5c8d4e2-1a3b-4c5d-8e9f-0a1b2c3d4e5f';
+
+            function setValues(cfg) {
+                try {
+                    document.getElementById('chkEnableGevi').checked = cfg.EnableGevi === true;
+                    document.getElementById('chkEnableAebn').checked = cfg.EnableAebn === true;
+                    document.getElementById('txtAebnApiKey').value = cfg.AebnApiKey || '';
+                    document.getElementById('selectLanguage').value = cfg.Language || 'en';
+                } catch (e) { /* ignore */ }
+            }
+
+            // Try to use Emby/Jellyfin client API if available
+            if (window.ServerManager || window.Emby || window.$) {
+                // Use the Plugins API if available
+                try {
+                    if (window.app && app.getPluginConfiguration) {
+                        app.getPluginConfiguration(pluginId).then(setValues).catch(()=>{});
+                    } else if (window.Emby && Emby.Plugin) {
+                        Emby.Plugin.GetPluginConfiguration(pluginId).then(setValues).catch(()=>{});
+                    }
+                } catch (e) { /* ignore */ }
+            }
+
+            // Fallback: try fetching the config endpoint
+            fetch('/plugins/configuration?pluginId=' + pluginId).then(r => {
+                if (!r.ok) return null;
+                return r.json();
+            }).then(cfg => {
+                if (cfg) setValues(cfg);
+            }).catch(()=>{});
+
+            form.addEventListener('submit', function (ev) {
+                ev.preventDefault();
+                const cfg = {
+                    EnableGevi: document.getElementById('chkEnableGevi').checked,
+                    EnableAebn: document.getElementById('chkEnableAebn').checked,
+                    AebnApiKey: document.getElementById('txtAebnApiKey').value,
+                    Language: document.getElementById('selectLanguage').value
+                };
+
+                // Try to save via client API if present
+                try {
+                    if (window.app && app.savePluginConfiguration) {
+                        app.savePluginConfiguration(pluginId, cfg).then(()=>alert('Saved')).catch(()=>alert('Save failed'));
+                        return;
+                    }
+                    if (window.Emby && Emby.Plugin) {
+                        Emby.Plugin.SavePluginConfiguration(pluginId, cfg).then(()=>alert('Saved')).catch(()=>alert('Save failed'));
+                        return;
+                    }
+                } catch (e) { /* ignore */ }
+
+                // Fallback: POST to server endpoint
+                fetch('/Plugins/SaveConfiguration?pluginId=' + pluginId, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(cfg)
+                }).then(r => {
+                    if (r.ok) alert('Saved'); else alert('Save failed');
+                }).catch(()=>alert('Save failed'));
+            });
+        })();
+    </script>
 </body>
 </html>
