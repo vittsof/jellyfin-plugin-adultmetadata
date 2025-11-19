@@ -249,7 +249,7 @@ namespace Jellyfin.Plugin.AdultMetadata.Movies
                     }
 
                     var lower = url.ToLowerInvariant();
-                    if (!(lower.Contains("title") || lower.Contains("video") || lower.Contains("watch") || lower.Contains("movie") || lower.Contains("aebn") || lower.Contains("gayeroticvideoindex")))
+                    if (!(lower.Contains("/movies/") || lower.Contains("/video/") || lower.Contains("/watch/") || lower.Contains("gayeroticvideoindex")))
                     {
                         continue;
                     }
