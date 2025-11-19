@@ -1,0 +1,16 @@
+C:\Users\Prog2\GitHub\Jellyfin\jellyfin\jellyfin-plugin-adultmetadata\publish\Jellyfin.Plugin.AdultMetadata.dll
+C:\Users\Prog2\GitHub\Jellyfin\jellyfin\jellyfin-plugin-adultmetadata\publish\Jellyfin.Plugin.AdultMetadata.deps.json
+C:\Users\Prog2\GitHub\Jellyfin\jellyfin\jellyfin-plugin-adultmetadata\publish\Jellyfin.Plugin.AdultMetadata.pdb
+C:\Users\Prog2\GitHub\Jellyfin\jellyfin\jellyfin-plugin-adultmetadata\publish\Diacritics.dll
+C:\Users\Prog2\GitHub\Jellyfin\jellyfin\jellyfin-plugin-adultmetadata\publish\ICU4N.dll
+C:\Users\Prog2\GitHub\Jellyfin\jellyfin\jellyfin-plugin-adultmetadata\publish\ICU4N.Transliterator.dll
+C:\Users\Prog2\GitHub\Jellyfin\jellyfin\jellyfin-plugin-adultmetadata\publish\J2N.dll
+C:\Users\Prog2\GitHub\Jellyfin\jellyfin\jellyfin-plugin-adultmetadata\publish\MediaBrowser.Common.dll
+C:\Users\Prog2\GitHub\Jellyfin\jellyfin\jellyfin-plugin-adultmetadata\publish\MediaBrowser.Controller.dll
+C:\Users\Prog2\GitHub\Jellyfin\jellyfin\jellyfin-plugin-adultmetadata\publish\Jellyfin.Data.dll
+C:\Users\Prog2\GitHub\Jellyfin\jellyfin\jellyfin-plugin-adultmetadata\publish\Jellyfin.Extensions.dll
+C:\Users\Prog2\GitHub\Jellyfin\jellyfin\jellyfin-plugin-adultmetadata\publish\MediaBrowser.Model.dll
+C:\Users\Prog2\GitHub\Jellyfin\jellyfin\jellyfin-plugin-adultmetadata\publish\Emby.Naming.dll
+C:\Users\Prog2\GitHub\Jellyfin\jellyfin\jellyfin-plugin-adultmetadata\publish\Microsoft.Extensions.Configuration.Binder.dll
+C:\Users\Prog2\GitHub\Jellyfin\jellyfin\jellyfin-plugin-adultmetadata\publish\Microsoft.Extensions.DependencyInjection.Abstractions.dll
+C:\Users\Prog2\GitHub\Jellyfin\jellyfin\jellyfin-plugin-adultmetadata\publish\Microsoft.Extensions.Logging.Abstractions.dll
