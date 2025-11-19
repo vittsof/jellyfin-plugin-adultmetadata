@@ -137,24 +137,49 @@ namespace Jellyfin.Plugin.AdultMetadata.Movies
             {
                 var client = _httpClientFactory.CreateClient();
                 client.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36");
-                var searchUrl = $"https://www.gevi.gr/search?q={Uri.EscapeDataString(name)}";
+                // GEVI (gayeroticvideoindex) uses a search endpoint with form/query params: type=t, where=b, query=...
+                var searchUrl = $"https://gayeroticvideoindex.com/search?type=t&where=b&query={Uri.EscapeDataString(name)}";
                 var response = await client.GetStringAsync(searchUrl, cancellationToken);
 
-                // Parse HTML for movie links
-                var movieLinks = Regex.Matches(response, @"<a[^>]*href=""([^""]*movie[^""]*)""[^>]*>([^<]*)</a>", RegexOptions.IgnoreCase);
-                foreach (Match match in movieLinks)
+                // Parse HTML for movie links using a more flexible anchor regex and filtering.
+                var anchorMatches = Regex.Matches(response, "<a[^>]*href\\s*=\\s*\"([^\"]+)\"[^>]*>(.*?)</a>", RegexOptions.IgnoreCase | RegexOptions.Singleline);
+                foreach (Match match in anchorMatches)
                 {
-                    var url = match.Groups[1].Value;
-                    var title = match.Groups[2].Value.Trim();
-                    if (!string.IsNullOrEmpty(title))
+                    var href = match.Groups[1].Value.Trim();
+                    var title = Regex.Replace(match.Groups[2].Value ?? string.Empty, "<[^>]+>", string.Empty).Trim();
+
+                    if (string.IsNullOrEmpty(href)) continue;
+
+                    // Resolve relative URLs
+                    string url;
+                    try
                     {
-                        results.Add(new RemoteSearchResult
-                        {
-                            Name = title,
-                            ProviderIds = new Dictionary<string, string> { { "Gevi", url } },
-                            SearchProviderName = Name
-                        });
+                        url = href.StartsWith("http", StringComparison.OrdinalIgnoreCase) ? href : new Uri(new Uri(searchUrl), href).ToString();
                     }
+                    catch
+                    {
+                        continue;
+                    }
+
+                    // Filter likely movie links by common path segments or by host
+                    var lower = url.ToLowerInvariant();
+                    if (!(lower.Contains("title") || lower.Contains("video") || lower.Contains("watch") || lower.Contains("movie") || lower.Contains("aebn") || lower.Contains("gayeroticvideoindex")))
+                    {
+                        continue;
+                    }
+
+                    if (string.IsNullOrEmpty(title))
+                    {
+                        // Use last segment as fallback
+                        try { title = Uri.UnescapeDataString(new Uri(url).Segments.Last()).Trim('/'); } catch { title = url; }
+                    }
+
+                    results.Add(new RemoteSearchResult
+                    {
+                        Name = title,
+                        ProviderIds = new Dictionary<string, string> { { "Gevi", url } },
+                        SearchProviderName = Name
+                    });
                 }
             }
             catch
@@ -171,24 +196,46 @@ namespace Jellyfin.Plugin.AdultMetadata.Movies
             {
                 var client = _httpClientFactory.CreateClient();
                 client.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36");
-                var searchUrl = $"https://www.aebn.net/search?q={Uri.EscapeDataString(name)}";
+                // AEBN (gay.aebn.com) search uses queryType and query params
+                var searchUrl = $"https://gay.aebn.com/gay/search?queryType=Free+Form&query={Uri.EscapeDataString(name)}";
                 var response = await client.GetStringAsync(searchUrl, cancellationToken);
 
-                // Parse HTML for movie links
-                var movieLinks = Regex.Matches(response, @"<a[^>]*href=""([^""]*movie[^""]*)""[^>]*>([^<]*)</a>", RegexOptions.IgnoreCase);
-                foreach (Match match in movieLinks)
+                // Parse HTML for movie links using flexible anchor matching and filters
+                var anchorMatches = Regex.Matches(response, "<a[^>]*href\\s*=\\s*\"([^\"]+)\"[^>]*>(.*?)</a>", RegexOptions.IgnoreCase | RegexOptions.Singleline);
+                foreach (Match match in anchorMatches)
                 {
-                    var url = match.Groups[1].Value;
-                    var title = match.Groups[2].Value.Trim();
-                    if (!string.IsNullOrEmpty(title))
+                    var href = match.Groups[1].Value.Trim();
+                    var title = Regex.Replace(match.Groups[2].Value ?? string.Empty, "<[^>]+>", string.Empty).Trim();
+
+                    if (string.IsNullOrEmpty(href)) continue;
+
+                    string url;
+                    try
                     {
-                        results.Add(new RemoteSearchResult
-                        {
-                            Name = title,
-                            ProviderIds = new Dictionary<string, string> { { "Aebn", url } },
-                            SearchProviderName = Name
-                        });
+                        url = href.StartsWith("http", StringComparison.OrdinalIgnoreCase) ? href : new Uri(new Uri(searchUrl), href).ToString();
                     }
+                    catch
+                    {
+                        continue;
+                    }
+
+                    var lower = url.ToLowerInvariant();
+                    if (!(lower.Contains("title") || lower.Contains("video") || lower.Contains("watch") || lower.Contains("movie") || lower.Contains("aebn") || lower.Contains("gayeroticvideoindex")))
+                    {
+                        continue;
+                    }
+
+                    if (string.IsNullOrEmpty(title))
+                    {
+                        try { title = Uri.UnescapeDataString(new Uri(url).Segments.Last()).Trim('/'); } catch { title = url; }
+                    }
+
+                    results.Add(new RemoteSearchResult
+                    {
+                        Name = title,
+                        ProviderIds = new Dictionary<string, string> { { "Aebn", url } },
+                        SearchProviderName = Name
+                    });
                 }
             }
             catch
