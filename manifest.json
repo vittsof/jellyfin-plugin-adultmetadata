@@ -1,0 +1,21 @@
+[
+  {
+    "guid": "f5c8d4e2-1a3b-4c5d-8e9f-0a1b2c3d4e5f",
+    "name": "Adult Metadata Provider",
+    "description": "Get metadata for adult movies from GEVI and AEBN.",
+    "owner": "vittsof",
+    "overview": "Adult metadata provider for Jellyfin",
+    "version": "1.0.0.0",
+    "status": "Active",
+    "imageUrl": "",
+    "versions": [
+      {
+        "version": "1.0.0.0",
+        "changelog": "Initial release",
+        "targetAbi": "10.9.0.0",
+        "sourceUrl": "https://github.com/vittsof/jellyfin-plugin-adultmetadata/releases/download/v1.0.0/Jellyfin.Plugin.AdultMetadata.dll",
+        "checksum": "sha256:6E96EFADC1C70CEF3DB28A3CAE1001A826CFE421C1FA40F7892A7CC1C1E77746"
+      }
+    ]
+  }
+]
