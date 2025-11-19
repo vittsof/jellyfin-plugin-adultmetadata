@@ -18,6 +18,7 @@ namespace Jellyfin.Plugin.AdultMetadata
         {
             // Register the metadata provider
             serviceCollection.AddScoped<IRemoteMetadataProvider<Movie, MovieInfo>, AdultMovieProvider>();
+            serviceCollection.AddScoped<IMetadataProvider<Movie>, AdultMovieProvider>();
         }
     }
 }

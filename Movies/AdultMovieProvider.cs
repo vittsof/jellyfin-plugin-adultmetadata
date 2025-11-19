@@ -22,7 +22,7 @@ namespace Jellyfin.Plugin.AdultMetadata.Movies
     /// <summary>
     /// Movie provider for adult content from GEVI and AEBN.
     /// </summary>
-    public class AdultMovieProvider : IRemoteMetadataProvider<Movie, MovieInfo>, IHasOrder
+    public class AdultMovieProvider : IRemoteMetadataProvider<Movie, MovieInfo>, IMetadataProvider<Movie>, IHasOrder
     {
         private readonly IHttpClientFactory _httpClientFactory;
         private readonly ILibraryManager _libraryManager;
@@ -41,7 +41,7 @@ namespace Jellyfin.Plugin.AdultMetadata.Movies
         }
 
         /// <inheritdoc />
-        public int Order => 2;
+        public int Order => 0;
 
         /// <inheritdoc />
         public string Name => "Adult Metadata Provider";
@@ -136,7 +136,8 @@ namespace Jellyfin.Plugin.AdultMetadata.Movies
             try
             {
                 var client = _httpClientFactory.CreateClient();
-                var searchUrl = $"https://www.gevi.com/search?q={Uri.EscapeDataString(name)}";
+                client.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36");
+                var searchUrl = $"https://www.gevi.gr/search?q={Uri.EscapeDataString(name)}";
                 var response = await client.GetStringAsync(searchUrl, cancellationToken);
 
                 // Parse HTML for movie links
@@ -169,6 +170,7 @@ namespace Jellyfin.Plugin.AdultMetadata.Movies
             try
             {
                 var client = _httpClientFactory.CreateClient();
+                client.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36");
                 var searchUrl = $"https://www.aebn.net/search?q={Uri.EscapeDataString(name)}";
                 var response = await client.GetStringAsync(searchUrl, cancellationToken);
 
@@ -201,6 +203,7 @@ namespace Jellyfin.Plugin.AdultMetadata.Movies
             try
             {
                 var client = _httpClientFactory.CreateClient();
+                client.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36");
                 string url;
                 if (identifier.StartsWith("http", StringComparison.OrdinalIgnoreCase))
                 {
@@ -218,7 +221,11 @@ namespace Jellyfin.Plugin.AdultMetadata.Movies
                 var response = await client.GetStringAsync(url, cancellationToken);
 
                 // Parse HTML for metadata
-                var titleMatch = Regex.Match(response, @"<title>([^<]*)</title>", RegexOptions.IgnoreCase);
+                var titleMatch = Regex.Match(response, @"<h1[^>]*>([^<]*)</h1>", RegexOptions.IgnoreCase);
+                if (!titleMatch.Success)
+                {
+                    titleMatch = Regex.Match(response, @"<title>([^<]*)</title>", RegexOptions.IgnoreCase);
+                }
                 var descriptionMatch = Regex.Match(response, @"<meta[^>]*name=""description""[^>]*content=""([^""]*)""[^>]*>", RegexOptions.IgnoreCase);
 
                 return new AdultMovieData
@@ -240,6 +247,7 @@ namespace Jellyfin.Plugin.AdultMetadata.Movies
             try
             {
                 var client = _httpClientFactory.CreateClient();
+                client.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36");
                 string url;
                 if (identifier.StartsWith("http", StringComparison.OrdinalIgnoreCase))
                 {
@@ -257,7 +265,11 @@ namespace Jellyfin.Plugin.AdultMetadata.Movies
                 var response = await client.GetStringAsync(url, cancellationToken);
 
                 // Parse HTML for metadata
-                var titleMatch = Regex.Match(response, @"<title>([^<]*)</title>", RegexOptions.IgnoreCase);
+                var titleMatch = Regex.Match(response, @"<h1[^>]*>([^<]*)</h1>", RegexOptions.IgnoreCase);
+                if (!titleMatch.Success)
+                {
+                    titleMatch = Regex.Match(response, @"<title>([^<]*)</title>", RegexOptions.IgnoreCase);
+                }
                 var descriptionMatch = Regex.Match(response, @"<meta[^>]*name=""description""[^>]*content=""([^""]*)""[^>]*>", RegexOptions.IgnoreCase);
 
                 return new AdultMovieData
