@@ -17,6 +17,7 @@ using MediaBrowser.Controller.Providers;
 using MediaBrowser.Model.Entities;
 using MediaBrowser.Model.Providers;
 using Jellyfin.Plugin.AdultMetadata.Configuration;
+using Microsoft.Extensions.Logging;
 
 namespace Jellyfin.Plugin.AdultMetadata.Movies
 {
@@ -27,6 +28,7 @@ namespace Jellyfin.Plugin.AdultMetadata.Movies
     {
         private readonly IHttpClientFactory _httpClientFactory;
         private readonly ILibraryManager _libraryManager;
+        private readonly ILogger<AdultMovieProvider> _logger;
         private readonly HttpClientHandler _handler = new HttpClientHandler { CookieContainer = new CookieContainer() };
         private readonly HttpClient _client;
 
@@ -35,12 +37,15 @@ namespace Jellyfin.Plugin.AdultMetadata.Movies
         /// </summary>
         /// <param name="libraryManager">The <see cref="ILibraryManager"/>.</param>
         /// <param name="httpClientFactory">The <see cref="IHttpClientFactory"/>.</param>
+        /// <param name="logger">The <see cref="ILogger{AdultMovieProvider}"/>.</param>
         public AdultMovieProvider(
             ILibraryManager libraryManager,
-            IHttpClientFactory httpClientFactory)
+            IHttpClientFactory httpClientFactory,
+            ILogger<AdultMovieProvider> logger)
         {
             _libraryManager = libraryManager;
             _httpClientFactory = httpClientFactory;
+            _logger = logger;
             _client = new HttpClient(_handler);
             _client.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36");
         }
@@ -72,6 +77,12 @@ namespace Jellyfin.Plugin.AdultMetadata.Movies
                 await _client.GetAsync("https://gay.aebn.com/avs/gate-redirect?f=%2Fgay", cancellationToken);
                 var aebnResults = await SearchAebn(searchInfo.Name, cancellationToken);
                 results.AddRange(aebnResults);
+            }
+
+            _logger.LogInformation("Found {Count} search results for '{Name}'", results.Count, searchInfo.Name);
+            foreach (var result in results)
+            {
+                _logger.LogDebug("Result: {Title} - {Url}", result.Name, result.SearchProviderName);
             }
 
             return results;
