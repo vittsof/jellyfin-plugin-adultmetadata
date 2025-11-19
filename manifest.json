@@ -14,7 +14,7 @@
         "changelog": "Initial release",
         "targetAbi": "10.11.0.0",
         "sourceUrl": "https://github.com/vittsof/jellyfin-plugin-adultmetadata/releases/download/v1.0.0/Jellyfin.Plugin.AdultMetadata.zip",
-        "checksum": "B450C6D0CE7B440215F8C60FC9114DFC"
+        "checksum": "EC132C6FB48ADE0B410EC57C2FD8699D"
       }
     ]
   }
