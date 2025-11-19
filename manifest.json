@@ -14,7 +14,7 @@
         "changelog": "Added cookie persistence and age-gate bypass for GEVI and AEBN.",
         "targetAbi": "10.11.3.0",
         "sourceUrl": "https://github.com/vittsof/jellyfin-plugin-adultmetadata/releases/download/v1.0.5/Jellyfin.Plugin.AdultMetadata.zip",
-  "checksum": "49DAB3815660102D2DD1232CB1398850"
+  "checksum": "56DDED57CF12A01190F772F9DF54AB09"
       }
     ]
   }
