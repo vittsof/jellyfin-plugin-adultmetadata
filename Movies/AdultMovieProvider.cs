@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
+using System.Net;
 using System.Net.Http;
 using System.Text.RegularExpressions;
 using System.Threading;
@@ -139,6 +140,10 @@ namespace Jellyfin.Plugin.AdultMetadata.Movies
                 client.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36");
                 // GEVI (gayeroticvideoindex) uses a search endpoint with form/query params: type=t, where=b, query=...
                 var searchUrl = $"https://gayeroticvideoindex.com/search?type=t&where=b&query={Uri.EscapeDataString(name)}";
+
+                // Try to pass age-gate if present
+                await EnsureAgeGatePassed(client, searchUrl, cancellationToken);
+
                 var response = await client.GetStringAsync(searchUrl, cancellationToken);
 
                 // Parse HTML for movie links using a more flexible anchor regex and filtering.
@@ -198,6 +203,10 @@ namespace Jellyfin.Plugin.AdultMetadata.Movies
                 client.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36");
                 // AEBN (gay.aebn.com) search uses queryType and query params
                 var searchUrl = $"https://gay.aebn.com/gay/search?queryType=Free+Form&query={Uri.EscapeDataString(name)}";
+
+                // Try to pass age-gate if present
+                await EnsureAgeGatePassed(client, searchUrl, cancellationToken);
+
                 var response = await client.GetStringAsync(searchUrl, cancellationToken);
 
                 // Parse HTML for movie links using flexible anchor matching and filters
@@ -341,6 +350,95 @@ namespace Jellyfin.Plugin.AdultMetadata.Movies
             movie.Studios = data.Studios?.ToArray() ?? Array.Empty<string>();
             movie.OfficialRating = "XXX";
             // Add more fields as needed
+        }
+
+        /// <summary>
+        /// Heuristic: detect common age-gate pages and try to submit an acceptance form or attach returned cookies
+        /// so subsequent requests will be allowed. This is best-effort and uses simple form detection.
+        /// </summary>
+        private async Task EnsureAgeGatePassed(HttpClient client, string url, CancellationToken cancellationToken)
+        {
+            try
+            {
+                // Do an initial GET
+                var resp = await client.GetAsync(url, cancellationToken);
+                var body = await resp.Content.ReadAsStringAsync(cancellationToken);
+
+                // Quick heuristics: look for age phrases or form that likely represents age gate
+                if (!Regex.IsMatch(body, "(are you over|age verification|age_gate|over 18|please verify your age|enter your birth)", RegexOptions.IgnoreCase))
+                {
+                    // nothing obvious indicating an age gate
+                    return;
+                }
+
+                // Try to find a form on the page
+                var formMatch = Regex.Match(body, "<form[^>]*action=\"([^\"]*)\"[^>]*>(.*?)</form>", RegexOptions.IgnoreCase | RegexOptions.Singleline);
+                if (!formMatch.Success)
+                {
+                    // If no form, try to pick up Set-Cookie returned and reuse
+                    if (resp.Headers.TryGetValues("Set-Cookie", out var sc))
+                    {
+                        var cookieHeader = string.Join("; ", sc.Select(s => s.Split(';')[0]));
+                        if (!string.IsNullOrEmpty(cookieHeader) && !client.DefaultRequestHeaders.Contains("Cookie"))
+                        {
+                            client.DefaultRequestHeaders.Add("Cookie", cookieHeader);
+                        }
+                    }
+                    return;
+                }
+
+                var action = formMatch.Groups[1].Value;
+                var formInner = formMatch.Groups[2].Value;
+
+                // Collect inputs
+                var inputs = new List<KeyValuePair<string, string>>();
+                foreach (Match im in Regex.Matches(formInner, "<input[^>]*name=\"([^\"]+)\"[^>]*>", RegexOptions.IgnoreCase))
+                {
+                    var name = im.Groups[1].Value;
+                    // try to find a value attribute
+                    var valMatch = Regex.Match(im.Value, "value=\"([^\"]*)\"", RegexOptions.IgnoreCase);
+                    var val = valMatch.Success ? valMatch.Groups[1].Value : string.Empty;
+                    // heuristics: if field name contains age/over/confirm/agree, set affirmative
+                    if (Regex.IsMatch(name, "age|over|confirm|agree|yes|accept", RegexOptions.IgnoreCase))
+                    {
+                        if (string.IsNullOrEmpty(val)) val = "yes";
+                    }
+                    inputs.Add(new KeyValuePair<string, string>(name, val));
+                }
+
+                // Resolve action URL
+                string actionUrl;
+                try
+                {
+                    actionUrl = action.StartsWith("http", StringComparison.OrdinalIgnoreCase) ? action : new Uri(new Uri(url), action).ToString();
+                }
+                catch
+                {
+                    actionUrl = url;
+                }
+
+                var content = new FormUrlEncodedContent(inputs);
+                var post = await client.PostAsync(actionUrl, content, cancellationToken);
+
+                // If server sets cookies, copy them into client default headers for next requests
+                if (post.Headers.TryGetValues("Set-Cookie", out var setCookies))
+                {
+                    var cookieHeader = string.Join("; ", setCookies.Select(s => s.Split(';')[0]));
+                    if (!string.IsNullOrEmpty(cookieHeader))
+                    {
+                        // replace existing Cookie header if present
+                        if (client.DefaultRequestHeaders.Contains("Cookie"))
+                        {
+                            client.DefaultRequestHeaders.Remove("Cookie");
+                        }
+                        client.DefaultRequestHeaders.Add("Cookie", cookieHeader);
+                    }
+                }
+            }
+            catch
+            {
+                // best-effort: swallow exceptions here so scraping can continue
+            }
         }
 
         /// <summary>
