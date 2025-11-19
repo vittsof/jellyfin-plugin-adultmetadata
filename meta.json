@@ -5,7 +5,7 @@
     "description": "Get metadata for adult movies from GEVI and AEBN.",
     "owner": "user",
     "overview": "Adult metadata provider for Jellyfin",
-    "version": "1.0.0.0",
+    "version": "1.0.2.0",
     "status": "Active",
     "imageUrl": ""
 }
