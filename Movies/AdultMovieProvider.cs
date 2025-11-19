@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Collections.Concurrent;
 using System.Linq;
 using System.Net;
 using System.Net.Http;
@@ -31,6 +32,8 @@ namespace Jellyfin.Plugin.AdultMetadata.Movies
         private readonly ILogger<AdultMovieProvider> _logger;
         private readonly HttpClientHandler _handler = new HttpClientHandler { CookieContainer = new CookieContainer() };
         private readonly HttpClient _client;
+    // Simple in-memory cache to avoid refetching movie pages for images
+    private static readonly ConcurrentDictionary<string, string> _imageCache = new ConcurrentDictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
         /// <summary>
         /// Initializes a new instance of the <see cref="AdultMovieProvider"/> class.
@@ -238,7 +241,7 @@ namespace Jellyfin.Plugin.AdultMetadata.Movies
                 // Prefer extracting movie tiles directly from the movies grid.
                 // Find anchors that link to movie pages and extract title from contained <img title="..."> or fallback to slug -> readable title.
                 var movieAnchors = new List<(string Url, string Title, string Image)>();
-                var movieAnchorMatches = Regex.Matches(response, "<a[^>]*href\\s*=\\s*\"(?<href>/gay/movies/[^"]+)\"[^>]*>(?<inner>.*?)</a>", RegexOptions.IgnoreCase | RegexOptions.Singleline);
+                var movieAnchorMatches = Regex.Matches(response, @"<a[^>]*href\s*=\s*""(?<href>/gay/movies/[^""]+)""[^>]*>(?<inner>.*?)</a>", RegexOptions.IgnoreCase | RegexOptions.Singleline);
                 foreach (Match match in movieAnchorMatches)
                 {
                     var href = match.Groups["href"].Value.Trim();
@@ -293,18 +296,61 @@ namespace Jellyfin.Plugin.AdultMetadata.Movies
                     movieAnchors.Add((url, title, image));
                 }
 
-                // Add unique results preserving order
+                // Add unique results preserving order. Fill ImageUrl by fetching movie page metadata if necessary (with caching).
                 foreach (var a in movieAnchors)
                 {
-                    if (results.Any(r => r.ProviderIds != null && r.ProviderIds.ContainsKey("Aebn") && r.ProviderIds["Aebn"].Equals(a.Url, StringComparison.OrdinalIgnoreCase)))
+                    var normalized = a.Url;
+                    if (results.Any(r => r.ProviderIds != null && r.ProviderIds.ContainsKey("Aebn") && NormalizeUrl(r.ProviderIds["Aebn"]).Equals(NormalizeUrl(a.Url), StringComparison.OrdinalIgnoreCase)))
                         continue;
 
-                    results.Add(new RemoteSearchResult
+                    string image = a.Image;
+
+                    if (string.IsNullOrWhiteSpace(image))
+                    {
+                        // Try cache first
+                        if (!_imageCache.TryGetValue(a.Url, out image))
+                        {
+                            try
+                            {
+                                var page = await _client.GetStringAsync(a.Url, cancellationToken);
+                                // Try og:image
+                                var og = Regex.Match(page, "<meta[^>]*property=\\\"og:image\\\"[^>]*content=\\\"(?<u>[^\\\"]+)\\\"[^>]*>", RegexOptions.IgnoreCase | RegexOptions.Singleline);
+                                if (!og.Success)
+                                {
+                                    og = Regex.Match(page, "<meta[^>]*name=\\\"twitter:image\\\"[^>]*content=\\\"(?<u>[^\\\"]+)\\\"[^>]*>", RegexOptions.IgnoreCase | RegexOptions.Singleline);
+                                }
+                                if (og.Success)
+                                {
+                                    image = og.Groups["u"].Value;
+                                }
+                                else
+                                {
+                                    // Fallback to first poster img
+                                    var imgm = Regex.Match(page, "<img[^>]*class=\\\"poster\\\"[^>]*src=\\\"(?<u>[^\\\"]+)\\\"[^>]*>", RegexOptions.IgnoreCase | RegexOptions.Singleline);
+                                    if (imgm.Success) image = imgm.Groups["u"].Value;
+                                }
+
+                                if (!string.IsNullOrWhiteSpace(image))
+                                {
+                                    _imageCache[a.Url] = image;
+                                }
+                            }
+                            catch
+                            {
+                                // ignore fetch errors
+                            }
+                        }
+                    }
+
+                    var r = new RemoteSearchResult
                     {
                         Name = a.Title,
                         ProviderIds = new Dictionary<string, string> { { "Aebn", a.Url } },
-                        SearchProviderName = Name
-                    });
+                        SearchProviderName = Name,
+                        ImageUrl = image
+                    };
+
+                    results.Add(r);
                 }
             }
             catch
@@ -325,6 +371,22 @@ namespace Jellyfin.Plugin.AdultMetadata.Movies
             return lower;
         }
 
+        // Normalize a provider URL for deduping: remove query/fragment and trailing slash, lowercase
+        private static string NormalizeUrl(string url)
+        {
+            if (string.IsNullOrWhiteSpace(url)) return string.Empty;
+            try
+            {
+                var u = new Uri(url);
+                var left = u.GetLeftPart(UriPartial.Path).TrimEnd('/');
+                return left.ToLowerInvariant();
+            }
+            catch
+            {
+                return url.Trim().TrimEnd('/').ToLowerInvariant();
+            }
+        }
+
         // Convert a slug like "armed-services" or "at-arm-s-length" into a readable title
         private static string SlugToTitle(string slug)
         {
@@ -334,7 +396,7 @@ namespace Jellyfin.Plugin.AdultMetadata.Movies
             var t = slug.Replace('-', ' ');
 
             // Common pattern: "-s-" often represents possessive in some slugs (e.g. at-arm-s-length -> at arm's length)
-            t = Regex.Replace(t, "\b(s)\b", "'s", RegexOptions.IgnoreCase);
+            t = Regex.Replace(t, "\\b(s)\\b", "'s", RegexOptions.IgnoreCase);
 
             // Collapse multiple spaces
             t = Regex.Replace(t, "\\s+", " ").Trim();
