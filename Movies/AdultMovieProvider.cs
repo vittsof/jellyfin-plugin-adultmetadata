@@ -146,6 +146,13 @@ namespace Jellyfin.Plugin.AdultMetadata.Movies
 
                 var response = await client.GetStringAsync(searchUrl, cancellationToken);
 
+                // If the response still contains age-gate phrases, try to handle it post-GET
+                if (Regex.IsMatch(response, "(are you over|age verification|age_gate|over 18|please verify your age|enter your birth)", RegexOptions.IgnoreCase))
+                {
+                    await HandleAgeGateInResponse(client, response, searchUrl, cancellationToken);
+                    response = await client.GetStringAsync(searchUrl, cancellationToken);
+                }
+
                 // Parse HTML for movie links using a more flexible anchor regex and filtering.
                 var anchorMatches = Regex.Matches(response, "<a[^>]*href\\s*=\\s*\"([^\"]+)\"[^>]*>(.*?)</a>", RegexOptions.IgnoreCase | RegexOptions.Singleline);
                 foreach (Match match in anchorMatches)
@@ -208,6 +215,13 @@ namespace Jellyfin.Plugin.AdultMetadata.Movies
                 await EnsureAgeGatePassed(client, searchUrl, cancellationToken);
 
                 var response = await client.GetStringAsync(searchUrl, cancellationToken);
+
+                // If the response still contains age-gate phrases, try to handle it post-GET
+                if (Regex.IsMatch(response, "(are you over|age verification|age_gate|over 18|please verify your age|enter your birth)", RegexOptions.IgnoreCase))
+                {
+                    await HandleAgeGateInResponse(client, response, searchUrl, cancellationToken);
+                    response = await client.GetStringAsync(searchUrl, cancellationToken);
+                }
 
                 // Parse HTML for movie links using flexible anchor matching and filters
                 var anchorMatches = Regex.Matches(response, "<a[^>]*href\\s*=\\s*\"([^\"]+)\"[^>]*>(.*?)</a>", RegexOptions.IgnoreCase | RegexOptions.Singleline);
@@ -274,7 +288,17 @@ namespace Jellyfin.Plugin.AdultMetadata.Movies
                     url = first.ProviderIds["Gevi"];
                 }
 
+                // Attempt to pass any age gate on the movie page
+                await EnsureAgeGatePassed(client, url, cancellationToken);
+
                 var response = await client.GetStringAsync(url, cancellationToken);
+
+                // If the response still contains age-gate phrases, try to handle it post-GET
+                if (Regex.IsMatch(response, "(are you over|age verification|age_gate|over 18|please verify your age|enter your birth)", RegexOptions.IgnoreCase))
+                {
+                    await HandleAgeGateInResponse(client, response, url, cancellationToken);
+                    response = await client.GetStringAsync(url, cancellationToken);
+                }
 
                 // Parse HTML for metadata
                 var titleMatch = Regex.Match(response, @"<h1[^>]*>([^<]*)</h1>", RegexOptions.IgnoreCase);
@@ -318,7 +342,17 @@ namespace Jellyfin.Plugin.AdultMetadata.Movies
                     url = first.ProviderIds["Aebn"];
                 }
 
+                // Attempt to pass any age gate on the movie page
+                await EnsureAgeGatePassed(client, url, cancellationToken);
+
                 var response = await client.GetStringAsync(url, cancellationToken);
+
+                // If the response still contains age-gate phrases, try to handle it post-GET
+                if (Regex.IsMatch(response, "(are you over|age verification|age_gate|over 18|please verify your age|enter your birth)", RegexOptions.IgnoreCase))
+                {
+                    await HandleAgeGateInResponse(client, response, url, cancellationToken);
+                    response = await client.GetStringAsync(url, cancellationToken);
+                }
 
                 // Parse HTML for metadata
                 var titleMatch = Regex.Match(response, @"<h1[^>]*>([^<]*)</h1>", RegexOptions.IgnoreCase);
@@ -384,6 +418,74 @@ namespace Jellyfin.Plugin.AdultMetadata.Movies
                             client.DefaultRequestHeaders.Add("Cookie", cookieHeader);
                         }
                     }
+                    return;
+                }
+
+                var action = formMatch.Groups[1].Value;
+                var formInner = formMatch.Groups[2].Value;
+
+                // Collect inputs
+                var inputs = new List<KeyValuePair<string, string>>();
+                foreach (Match im in Regex.Matches(formInner, "<input[^>]*name=\"([^\"]+)\"[^>]*>", RegexOptions.IgnoreCase))
+                {
+                    var name = im.Groups[1].Value;
+                    // try to find a value attribute
+                    var valMatch = Regex.Match(im.Value, "value=\"([^\"]*)\"", RegexOptions.IgnoreCase);
+                    var val = valMatch.Success ? valMatch.Groups[1].Value : string.Empty;
+                    // heuristics: if field name contains age/over/confirm/agree, set affirmative
+                    if (Regex.IsMatch(name, "age|over|confirm|agree|yes|accept", RegexOptions.IgnoreCase))
+                    {
+                        if (string.IsNullOrEmpty(val)) val = "yes";
+                    }
+                    inputs.Add(new KeyValuePair<string, string>(name, val));
+                }
+
+                // Resolve action URL
+                string actionUrl;
+                try
+                {
+                    actionUrl = action.StartsWith("http", StringComparison.OrdinalIgnoreCase) ? action : new Uri(new Uri(url), action).ToString();
+                }
+                catch
+                {
+                    actionUrl = url;
+                }
+
+                var content = new FormUrlEncodedContent(inputs);
+                var post = await client.PostAsync(actionUrl, content, cancellationToken);
+
+                // If server sets cookies, copy them into client default headers for next requests
+                if (post.Headers.TryGetValues("Set-Cookie", out var setCookies))
+                {
+                    var cookieHeader = string.Join("; ", setCookies.Select(s => s.Split(';')[0]));
+                    if (!string.IsNullOrEmpty(cookieHeader))
+                    {
+                        // replace existing Cookie header if present
+                        if (client.DefaultRequestHeaders.Contains("Cookie"))
+                        {
+                            client.DefaultRequestHeaders.Remove("Cookie");
+                        }
+                        client.DefaultRequestHeaders.Add("Cookie", cookieHeader);
+                    }
+                }
+            }
+            catch
+            {
+                // best-effort: swallow exceptions here so scraping can continue
+            }
+        }
+
+        /// <summary>
+        /// Handle age-gate in the response by submitting the form if found.
+        /// </summary>
+        private async Task HandleAgeGateInResponse(HttpClient client, string response, string url, CancellationToken cancellationToken)
+        {
+            try
+            {
+                // Try to find a form on the page
+                var formMatch = Regex.Match(response, "<form[^>]*action=\"([^\"]*)\"[^>]*>(.*?)</form>", RegexOptions.IgnoreCase | RegexOptions.Singleline);
+                if (!formMatch.Success)
+                {
                     return;
                 }
 
