@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Adult Metadata Provider Configuration</title>
+</head>
+<body>
+    <div data-role="page" class="page type-interior pluginConfigurationPage" data-require="emby-input,emby-button,emby-select,emby-checkbox">
+        <div data-role="content">
+            <div class="content-primary">
+                <form class="adultMetadataConfigurationForm">
+                    <div class="verticalSection">
+                        <h2 class="sectionTitle">Adult Metadata Provider</h2>
+                        <div class="inputContainer">
+                            <label class="inputLabel inputLabelUnfocused" for="chkEnableGevi">Enable GEVI Provider</label>
+                            <input type="checkbox" id="chkEnableGevi" class="emby-checkbox" />
+                            <div class="fieldDescription">Enable fetching metadata from GEVI.</div>
+                        </div>
+                        <div class="inputContainer">
+                            <label class="inputLabel inputLabelUnfocused" for="chkEnableAebn">Enable AEBN Provider</label>
+                            <input type="checkbox" id="chkEnableAebn" class="emby-checkbox" />
+                            <div class="fieldDescription">Enable fetching metadata from AEBN.</div>
+                        </div>
+                        <div class="inputContainer">
+                            <label class="inputLabel inputLabelUnfocused" for="txtAebnApiKey">AEBN API Key</label>
+                            <input type="text" id="txtAebnApiKey" class="emby-input" />
+                            <div class="fieldDescription">API key for AEBN (if available).</div>
+                        </div>
+                        <div class="inputContainer">
+                            <label class="inputLabel inputLabelUnfocused" for="selectLanguage">Language</label>
+                            <select id="selectLanguage" class="emby-select">
+                                <option value="en">English</option>
+                                <option value="el">Greek</option>
+                            </select>
+                            <div class="fieldDescription">Preferred language for metadata.</div>
+                        </div>
+                    </div>
+                    <div>
+                        <button type="submit" class="emby-button raised button-submit block">Save</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

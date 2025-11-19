@@ -1,0 +1,12 @@
+C:\Users\Prog2\GitHub\Jellyfin\jellyfin\jellyfin-plugin-adultmetadata\obj\Debug\net8.0\Jellyfin.Plugin.AdultMetadata.csproj.AssemblyReference.cache
+C:\Users\Prog2\GitHub\Jellyfin\jellyfin\jellyfin-plugin-adultmetadata\obj\Debug\net8.0\Jellyfin.Plugin.AdultMetadata.GeneratedMSBuildEditorConfig.editorconfig
+C:\Users\Prog2\GitHub\Jellyfin\jellyfin\jellyfin-plugin-adultmetadata\obj\Debug\net8.0\Jellyfin.Plugin.AdultMetadata.AssemblyInfoInputs.cache
+C:\Users\Prog2\GitHub\Jellyfin\jellyfin\jellyfin-plugin-adultmetadata\obj\Debug\net8.0\Jellyfin.Plugin.AdultMetadata.AssemblyInfo.cs
+C:\Users\Prog2\GitHub\Jellyfin\jellyfin\jellyfin-plugin-adultmetadata\obj\Debug\net8.0\Jellyfin.Plugin.AdultMetadata.csproj.CoreCompileInputs.cache
+C:\Users\Prog2\GitHub\Jellyfin\jellyfin\jellyfin-plugin-adultmetadata\bin\Debug\net8.0\Jellyfin.Plugin.AdultMetadata.deps.json
+C:\Users\Prog2\GitHub\Jellyfin\jellyfin\jellyfin-plugin-adultmetadata\bin\Debug\net8.0\Jellyfin.Plugin.AdultMetadata.dll
+C:\Users\Prog2\GitHub\Jellyfin\jellyfin\jellyfin-plugin-adultmetadata\bin\Debug\net8.0\Jellyfin.Plugin.AdultMetadata.pdb
+C:\Users\Prog2\GitHub\Jellyfin\jellyfin\jellyfin-plugin-adultmetadata\obj\Debug\net8.0\Jellyfin.Plugin.AdultMetadata.dll
+C:\Users\Prog2\GitHub\Jellyfin\jellyfin\jellyfin-plugin-adultmetadata\obj\Debug\net8.0\refint\Jellyfin.Plugin.AdultMetadata.dll
+C:\Users\Prog2\GitHub\Jellyfin\jellyfin\jellyfin-plugin-adultmetadata\obj\Debug\net8.0\Jellyfin.Plugin.AdultMetadata.pdb
+C:\Users\Prog2\GitHub\Jellyfin\jellyfin\jellyfin-plugin-adultmetadata\obj\Debug\net8.0\ref\Jellyfin.Plugin.AdultMetadata.dll

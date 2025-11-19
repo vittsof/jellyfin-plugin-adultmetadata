@@ -1,0 +1,11 @@
+{
+    "category": "Metadata",
+    "guid": "f5c8d4e2-1a3b-4c5d-8e9f-0a1b2c3d4e5f",
+    "name": "Adult Metadata Provider",
+    "description": "Get metadata for adult movies from GEVI and AEBN.",
+    "owner": "user",
+    "overview": "Adult metadata provider for Jellyfin",
+    "version": "1.0.0.0",
+    "status": "Active",
+    "imageUrl": ""
+}
