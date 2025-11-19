@@ -13,8 +13,8 @@
         "version": "1.0.0.0",
         "changelog": "Initial release",
         "targetAbi": "10.11.0.0",
-        "sourceUrl": "https://github.com/vittsof/jellyfin-plugin-adultmetadata/releases/download/v1.0.0/Jellyfin.Plugin.AdultMetadata.dll",
-        "checksum": "sha256:6E96EFADC1C70CEF3DB28A3CAE1001A826CFE421C1FA40F7892A7CC1C1E77746"
+        "sourceUrl": "https://github.com/vittsof/jellyfin-plugin-adultmetadata/releases/download/v1.0.0/Jellyfin.Plugin.AdultMetadata.zip",
+        "checksum": "sha256:C4A142DAD57A9C58665228EEF4C1C111BDB49B91845B99FD9AA2AA0A5834A6EB"
       }
     ]
   }
